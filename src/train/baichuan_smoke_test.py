@@ -130,6 +130,7 @@ def main():
     classifier.train()
     if hasattr(classifier.causal_lm, "enable_input_require_grads"):
         classifier.causal_lm.enable_input_require_grads()
+    trainable_report = trainable_parameter_report(classifier)
 
     optimizer = AdamW([p for p in classifier.parameters() if p.requires_grad], lr=1e-4)
 
@@ -165,7 +166,7 @@ def main():
 
         print("reload_check=started")
         base = load_baichuan_causal_lm(MODEL_DIR)
-        reloaded_lm = PeftModel.from_pretrained(base, adapter_dir)
+        reloaded_lm = PeftModel.from_pretrained(base, adapter_dir, is_trainable=True)
         reloaded = BaichuanRiskClassifier(reloaded_lm, hidden_size=5120, dropout=0.1)
         reloaded.classifier.load_state_dict(torch.load(classifier_head_path, map_location="cpu"))
         reloaded.eval()
@@ -194,7 +195,7 @@ def main():
         "reload_max_abs_logit_diff": reload_max_abs_diff,
         "reload_checked": not SKIP_RELOAD,
         "gpu_peak_memory_gb": peak_memory_gb,
-        "trainable_parameters": trainable_parameter_report(reloaded if not SKIP_RELOAD else classifier),
+        "trainable_parameters": trainable_report,
         "checks": {
             "tokenizer_local_load": True,
             "four_bit_base_model_load": True,
