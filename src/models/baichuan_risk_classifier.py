@@ -17,6 +17,9 @@ class BaichuanRiskClassifier(nn.Module):
     def forward(self, input_ids, attention_mask, labels=None):
         outputs = self.decoder()(input_ids=input_ids, attention_mask=attention_mask, use_cache=False, return_dict=True)
         hidden = outputs.last_hidden_state
+        classifier_device = next(self.classifier.parameters()).device
+        if classifier_device != hidden.device:
+            self.classifier.to(hidden.device)
         last_index = attention_mask.sum(dim=1) - 1
         batch_idx = torch.arange(hidden.shape[0], device=hidden.device)
         pooled = hidden[batch_idx, last_index].float()
