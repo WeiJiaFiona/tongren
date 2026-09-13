@@ -1,0 +1,28 @@
+name: tongren_m1
+python: "3.11"
+gpu_target: NVIDIA L20
+cuda: "12.1"
+packages:
+  conda:
+    - python=3.11
+    - pip
+  pip:
+    - torch
+    - torchvision
+    - torchaudio
+    - transformers==4.48.1
+    - peft
+    - bitsandbytes
+    - flash-attn==2.7.4.post1
+    - accelerate
+    - safetensors
+    - sentencepiece
+    - ninja
+    - packaging
+    - psutil
+    - scikit-learn
+    - numpy
+    - pandas
+    - pyyaml
+    - tqdm
+    - pyarrow

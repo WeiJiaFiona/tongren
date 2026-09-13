@@ -1,0 +1,35 @@
+paths:
+  model_dir: /public_bme/home/jiawei2022/tongren_bme_transition/code/model/Baichuan-M1-14B-Instruct
+  train_core: /public_bme/home/jiawei2022/tongren_bme_transition/code/src/data/train_core/patient_state_train_core.jsonl
+  validation: /public_bme/home/jiawei2022/tongren_bme_transition/code/src/data/validation/patient_state_validation.jsonl
+  test: /public_bme/home/jiawei2022/tongren_bme_transition/code/src/data/test/patient_state_test.jsonl
+  output_dir: /public_bme/home/jiawei2022/tongren_bme_transition/outputs
+
+model:
+  quantization: 4bit_nf4
+  compute_dtype: bfloat16
+  trust_remote_code: true
+  use_cache: false
+  lora_targets: [W_pack, o_proj]
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  classifier_dropout: 0.1
+  hidden_size: 5120
+
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 16
+  epochs: 3
+  lora_lr: 0.0001
+  classifier_lr: 0.0005
+  weight_decay: 0.01
+  warmup_ratio: 0.05
+  gradient_clip: 1.0
+  early_stopping_patience: 2
+  primary_metric: AUPRC
+
+retrieval:
+  k_candidates: [5, 10, 20, 50]
+  selected_k: null
+  ambiguity_delta: null

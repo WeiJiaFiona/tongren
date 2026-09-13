@@ -1,0 +1,61 @@
+task:
+  name: 半年内脑梗标签识别
+  label_key: 半年内脑梗
+  id_key: 患者ID
+
+risk_factors:
+  - 年龄
+  - 性别
+  - 体质指数(BMI)
+  - 收缩压
+  - 舒张压
+  - 吸烟状态
+  - 饮酒
+  - 高血压
+  - 糖尿病
+  - 脑卒中家族史
+  - 血脂异常
+  - 缺乏体育活动
+
+lab_features:
+  - 高密度脂蛋白胆固醇
+  - 低密度脂蛋白胆固醇
+  - 非高密度脂蛋白胆固醇
+  - 甘油三酯
+  - 载脂蛋白B
+  - 脂蛋白(a)
+  - 糖化血红蛋白
+  - 同型半胱氨酸
+  - 纤维蛋白原
+  - 小而密低密度脂蛋白胆固醇
+
+raw_ultrasound_fields:
+  - 超声描述
+  - 超声结论
+
+carotid_structured_features:
+  - 最大颈总动脉IMT(mm)
+  - IMT临床状态
+  - CPS报告值
+  - 颈动脉斑块存在
+  - 斑块数量状态
+  - 双侧颈动脉斑块
+  - 最大颈动脉斑块长度(mm)
+  - 最大颈动脉斑块厚度(mm)
+  - 最大颈动脉狭窄率(%)
+  - 狭窄分级
+  - 最大颈内动脉PSV(cm/s)
+  - 最大ICA/CCA PSV比值
+  - 斑块回声类型
+  - 斑块回声不均匀
+  - 斑块表面状态
+  - 纤维帽缺损
+  - 溃疡
+  - CEUS分级
+
+statuses:
+  - observed
+  - derived
+  - missing
+  - explicitly_absent
+  - estimated

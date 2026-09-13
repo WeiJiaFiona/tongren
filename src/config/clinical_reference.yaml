@@ -1,0 +1,51 @@
+version: 0.1.0
+notes:
+  - Blood laboratory reference ranges are intentionally omitted until Tongren hospital units/ranges are confirmed.
+
+cca_imt:
+  unit: mm
+  source: project_spec
+  strata:
+    - label: 正常
+      rule: value < 1.0
+    - label: IMT增厚
+      rule: 1.0 <= value < 1.5
+    - label: 达到斑块厚度判据之一
+      rule: value >= 1.5
+
+plaque_count:
+  source: project_spec
+  multifocal_terms:
+    - 数个
+    - 多个
+    - 多发
+  multifocal_numeric_rule: count >= 2
+
+stenosis_grade:
+  unit: "%"
+  source: project_spec
+  strata:
+    - label: 轻度
+      rule: value < 50
+    - label: 中度
+      rule: 50 <= value <= 69
+    - label: 重度
+      rule: 70 <= value <= 99
+    - label: 闭塞
+      rule: value >= 100 or text contains 闭塞
+
+ica_psv:
+  unit: cm/s
+  source: project_spec
+  role: auxiliary only
+
+ica_cca_psv_ratio:
+  source: project_spec
+  role: auxiliary only
+
+ceus_grade:
+  source: project_spec
+  grades:
+    "1": 明确完成CEUS且无增强
+    "2": 少量微泡、基底部/肩部
+    "3": 大量/广泛/弥漫增强

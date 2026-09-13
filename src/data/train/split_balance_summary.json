@@ -1,0 +1,103 @@
+{
+  "split_config": {
+    "train_ratio": 0.8,
+    "test_ratio": 0.19999999999999996,
+    "base_seed": 20260913,
+    "selected_seed": 20261250,
+    "n_seeds_tried": 400,
+    "stratification": "label + danger_missing_ratio_bin + n_missing_lab_bin + ultrasound_missing_state, sparse strata progressively merged"
+  },
+  "train": {
+    "n": 19736,
+    "label_positive_count": 1283,
+    "label_positive_rate": 0.06500810701256587,
+    "danger_missing_rate_mean": 0.11004427933724638,
+    "lab_missing_rate_mean": 0.8958198216457358,
+    "ultrasound_missing_rate_mean": 0.14792764491284963,
+    "overall_missing_rate_mean": 0.4406078893393384,
+    "n_missing_lab_distribution": {
+      "0": 680,
+      "1": 931,
+      "2": 265,
+      "3": 162,
+      "4": 169,
+      "5": 111,
+      "6": 44,
+      "7": 8,
+      "8": 71,
+      "9": 217,
+      "10": 17078
+    },
+    "danger_complete_count": 13080,
+    "danger_complete_rate": 0.6627482772598298,
+    "lab_complete_count": 680,
+    "lab_complete_rate": 0.03445480340494528,
+    "ultrasound_complete_count": 14206,
+    "ultrasound_complete_rate": 0.7198013781921362
+  },
+  "test": {
+    "n": 4934,
+    "label_positive_count": 316,
+    "label_positive_rate": 0.06404539927036887,
+    "danger_missing_rate_mean": 0.10993449898662415,
+    "lab_missing_rate_mean": 0.897203080664772,
+    "ultrasound_missing_rate_mean": 0.14704094041345764,
+    "overall_missing_rate_mean": 0.44105546635588405,
+    "n_missing_lab_distribution": {
+      "0": 170,
+      "1": 233,
+      "2": 63,
+      "3": 38,
+      "4": 39,
+      "5": 26,
+      "6": 13,
+      "7": 1,
+      "8": 14,
+      "9": 58,
+      "10": 4279
+    },
+    "danger_complete_count": 3278,
+    "danger_complete_rate": 0.6643696797730037,
+    "lab_complete_count": 170,
+    "lab_complete_rate": 0.03445480340494528,
+    "ultrasound_complete_count": 3554,
+    "ultrasound_complete_rate": 0.720308066477503
+  },
+  "balance": {
+    "score": 0.08293992100747011,
+    "label_positive_rate_diff": 0.0009627077421970054,
+    "max_n_missing_lab_prop_diff": 0.0019254154843939553,
+    "smd": {
+      "danger_missing_ratio": 0.0006583874061061968,
+      "lab_missing_ratio": 0.004913638224672082,
+      "ultrasound_missing_ratio": 0.0036348440399593803,
+      "overall_missing_ratio": 0.002600125311895168,
+      "n_missing_lab": 0.004913638224726754
+    },
+    "module_mean_missing_rate_abs_diff": {
+      "danger_missing_ratio": 0.00010978035062222946,
+      "lab_missing_ratio": 0.0013832590190361316,
+      "ultrasound_missing_ratio": 0.0008867044993919881,
+      "overall_missing_ratio": 0.00044757701654563053
+    },
+    "complete_rate_abs_diff": {
+      "danger_complete": 0.0016214025131738863,
+      "lab_complete": 0.0,
+      "ultrasound_complete": 0.0005066882853668186
+    },
+    "label_positive_rate_diff_pct_points": 0.0963,
+    "module_mean_missing_rate_abs_diff_pct_points": {
+      "danger_missing_ratio": 0.011,
+      "lab_missing_ratio": 0.1383,
+      "ultrasound_missing_ratio": 0.0887,
+      "overall_missing_ratio": 0.0448
+    },
+    "complete_rate_abs_diff_pct_points": {
+      "danger_complete": 0.1621,
+      "lab_complete": 0.0,
+      "ultrasound_complete": 0.0507
+    },
+    "max_n_missing_lab_prop_diff_pct_points": 0.1925,
+    "smd_target": "<0.1 preferred"
+  }
+}
