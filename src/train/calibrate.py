@@ -21,7 +21,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 
 
-ROOT = Path("/public_bme/home/jiawei2022/tongren_bme_transition")
+ROOT = Path(os.environ.get("TONGREN_PROJECT_ROOT", "/public_bme/home/jiawei2022/tongren_bme_transition"))
 sys.path.insert(0, str(ROOT / "code"))
 
 from src.models.baichuan_risk_classifier import BaichuanRiskClassifier, load_baichuan_causal_lm
@@ -37,7 +37,16 @@ METRICS_DIR = ROOT / "outputs/metrics"
 
 def read_config():
     with CONFIG_PATH.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        config = yaml.safe_load(f)
+    for key, value in list(config.get("paths", {}).items()):
+        path = Path(value)
+        if not path.is_absolute() or path.exists():
+            continue
+        marker = "tongren_bme_transition/"
+        text = str(path)
+        if marker in text:
+            config["paths"][key] = str(ROOT / text.split(marker, 1)[1])
+    return config
 
 
 def sigmoid(values):
