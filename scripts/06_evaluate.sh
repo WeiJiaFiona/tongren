@@ -11,16 +11,22 @@
 
 set -euo pipefail
 
-echo "Running on node: $SLURM_JOB_NODELIST"
-nvidia-smi
+echo "Running on node: ${SLURM_JOB_NODELIST:-local}"
+nvidia-smi || true
 echo "Starting at: $(date)"
 
-cd /public_bme/home/jiawei2022/tongren_bme_transition
+PROJECT_ROOT="${TONGREN_PROJECT_ROOT:-/home/jiawei2022/tongren_neckplaque/tongren_bme_transition}"
+cd "$PROJECT_ROOT"
+
+set +u
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tongren_m1
+set -u
+
 mkdir -p logs
 
-PYTHONPATH=/public_bme/home/jiawei2022/tongren_bme_transition/code \
-python code/src/train/evaluate.py
+export TONGREN_PROJECT_ROOT="$PROJECT_ROOT"
+PYTHONPATH="$PROJECT_ROOT/code" \
+python -u "$PROJECT_ROOT/code/src/train/evaluate.py"
 
 echo "Finished at: $(date)"

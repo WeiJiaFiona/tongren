@@ -4,5 +4,4 @@ __pycache__/
 *.err
 logs/
 outputs/
-model/Baichuan-M1-14B-Instruct/*
-!model/Baichuan-M1-14B-Instruct/.gitkeep
+model/Baichuan-M1-14B-Instruct/
