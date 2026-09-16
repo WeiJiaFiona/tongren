@@ -15,7 +15,11 @@ echo "Running on node: ${SLURM_JOB_NODELIST:-local}"
 nvidia-smi || true
 echo "Starting at: $(date)"
 
-PROJECT_ROOT="${TONGREN_PROJECT_ROOT:-/home/jiawei2022/tongren_neckplaque/tongren_bme_transition}"
+PROJECT_ROOT="${TONGREN_PROJECT_ROOT:-/public_bme/home/jiawei2022/tongren_bme_transition}"
+if [[ ! -d "$PROJECT_ROOT/code" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+fi
 cd "$PROJECT_ROOT"
 
 set +u
