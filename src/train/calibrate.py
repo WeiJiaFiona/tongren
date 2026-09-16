@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import csv
 import json
 import os
 import sys
@@ -8,11 +9,17 @@ import numpy as np
 import torch
 import yaml
 from peft import PeftModel
+from sklearn.calibration import calibration_curve
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
+    accuracy_score,
     average_precision_score,
     brier_score_loss,
+    confusion_matrix,
     f1_score,
-    precision_recall_curve,
+    fbeta_score,
+    precision_score,
+    recall_score,
     roc_auc_score,
 )
 from torch.nn import functional as F
@@ -53,41 +60,135 @@ def sigmoid(values):
     return 1.0 / (1.0 + np.exp(-np.asarray(values, dtype=np.float64)))
 
 
+def fit_platt_calibrator(logits, labels):
+    x = np.asarray(logits, dtype=np.float64).reshape(-1, 1)
+    y = np.asarray(labels, dtype=np.int32)
+    try:
+        model = LogisticRegression(penalty=None, solver="lbfgs")
+        model.fit(x, y)
+        method = {"penalty": None, "solver": "lbfgs"}
+    except (TypeError, ValueError):
+        model = LogisticRegression(C=1e6, solver="lbfgs")
+        model.fit(x, y)
+        method = {"C": 1e6, "solver": "lbfgs", "fallback_for_penalty_none": True}
+    calibrator = PlattCalibrator()
+    calibrator.model = model
+    return calibrator, method
+
+
 def metric_report(labels, probs):
     y = np.asarray(labels, dtype=np.int32)
     p = np.asarray(probs, dtype=np.float64)
     return {
+        "auroc": float(roc_auc_score(y, p)) if len(set(y.tolist())) > 1 else None,
         "auprc": float(average_precision_score(y, p)) if len(set(y.tolist())) > 1 else None,
-        "roc_auc": float(roc_auc_score(y, p)) if len(set(y.tolist())) > 1 else None,
         "brier": float(brier_score_loss(y, p)),
     }
 
 
-def select_threshold(labels, probs):
+def calibration_slope_intercept(labels, probs):
+    y = np.asarray(labels, dtype=np.int32)
+    p = np.clip(np.asarray(probs, dtype=np.float64), 1e-6, 1 - 1e-6)
+    logits = np.log(p / (1 - p)).reshape(-1, 1)
+    model = LogisticRegression(penalty=None, solver="lbfgs")
+    try:
+        model.fit(logits, y)
+    except (TypeError, ValueError):
+        model = LogisticRegression(C=1e6, solver="lbfgs")
+        model.fit(logits, y)
+    return {
+        "intercept": float(model.intercept_[0]),
+        "slope": float(model.coef_[0][0]),
+    }
+
+
+def calibration_curve_report(labels, probs, n_bins=10):
+    fraction_pos, mean_pred = calibration_curve(labels, probs, n_bins=n_bins, strategy="quantile")
+    return [
+        {"mean_predicted_probability": float(x), "fraction_of_positives": float(y)}
+        for x, y in zip(mean_pred, fraction_pos)
+    ]
+
+
+def threshold_metrics(labels, probs, threshold):
     y = np.asarray(labels, dtype=np.int32)
     p = np.asarray(probs, dtype=np.float64)
-    precision, recall, thresholds = precision_recall_curve(y, p)
-    candidates = []
-    for idx, threshold in enumerate(thresholds):
-        pred = (p >= threshold).astype(np.int32)
-        candidates.append(
-            {
-                "threshold": float(threshold),
-                "f1": float(f1_score(y, pred, zero_division=0)),
-                "precision": float(precision[idx]),
-                "recall": float(recall[idx]),
-                "positive_prediction_rate": float(pred.mean()),
-            }
-        )
+    pred = (p >= float(threshold)).astype(np.int32)
+    tn, fp, fn, tp = confusion_matrix(y, pred, labels=[0, 1]).ravel()
+    sensitivity = recall_score(y, pred, zero_division=0)
+    specificity = tn / (tn + fp) if (tn + fp) else 0.0
+    precision = precision_score(y, pred, zero_division=0)
+    npv = tn / (tn + fn) if (tn + fn) else 0.0
+    return {
+        "threshold": float(threshold),
+        "tp": int(tp),
+        "fp": int(fp),
+        "tn": int(tn),
+        "fn": int(fn),
+        "sensitivity": float(sensitivity),
+        "recall": float(sensitivity),
+        "specificity": float(specificity),
+        "precision": float(precision),
+        "ppv": float(precision),
+        "npv": float(npv),
+        "f1": float(f1_score(y, pred, zero_division=0)),
+        "f2": float(fbeta_score(y, pred, beta=2, zero_division=0)),
+        "accuracy": float(accuracy_score(y, pred)),
+        "positive_prediction_rate": float(pred.mean()) if len(pred) else 0.0,
+        "youden_j": float(sensitivity + specificity - 1),
+    }
+
+
+def threshold_sweep(labels, probs):
+    thresholds = sorted(set(float(x) for x in probs), reverse=True)
+    return [threshold_metrics(labels, probs, threshold) for threshold in thresholds]
+
+
+def choose_constrained(rows, min_specificity, label):
+    candidates = [row for row in rows if row["specificity"] >= min_specificity]
     if not candidates:
-        return {
-            "threshold": 0.5,
-            "f1": None,
-            "precision": None,
-            "recall": None,
-            "positive_prediction_rate": None,
-        }
-    return max(candidates, key=lambda x: (x["f1"], x["recall"], -x["threshold"]))
+        return {"label": label, "min_specificity": min_specificity, "available": False}
+    selected = max(
+        candidates,
+        key=lambda row: (row["sensitivity"], row["f2"], row["specificity"], row["precision"]),
+    )
+    return {"label": label, "min_specificity": min_specificity, "available": True, **selected}
+
+
+def choose_sensitivity_target(rows, target):
+    selected = min(
+        rows,
+        key=lambda row: (abs(row["sensitivity"] - target), -row["specificity"], -row["precision"]),
+    )
+    return {"label": f"sensitivity_target_{target:.2f}", "target_sensitivity": target, **selected}
+
+
+def write_json(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def write_jsonl(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def write_csv(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        return
+    fieldnames = []
+    for row in rows:
+        for key in row.keys():
+            if key not in fieldnames:
+                fieldnames.append(key)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def load_selected_model(config, checkpoint_dir):
@@ -148,19 +249,6 @@ def collect_validation_logits(model, loader, device, pos_weight):
     return rows, float(np.mean(losses)) if losses else None
 
 
-def write_json(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def write_jsonl(path, rows):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-
 def main():
     config = read_config()
     checkpoint_dir = Path(os.environ.get("SELECTED_CHECKPOINT", str(DEFAULT_CHECKPOINT)))
@@ -194,22 +282,58 @@ def main():
     logits = [row["logit"] for row in rows]
     raw_probs = [row["raw_probability"] for row in rows]
 
-    calibrator = PlattCalibrator().fit(logits, labels)
+    calibrator, platt_fit = fit_platt_calibrator(logits, labels)
     calibrated_probs = calibrator.predict_proba(logits)
     for row, calibrated in zip(rows, calibrated_probs):
         row["calibrated_probability"] = float(calibrated)
 
-    threshold = select_threshold(labels, calibrated_probs)
+    sweep_rows = threshold_sweep(labels, calibrated_probs)
+    conservative = choose_constrained(sweep_rows, 0.85, "conservative_specificity_ge_0.85")
+    primary = choose_constrained(sweep_rows, 0.80, "balanced_screening_primary_specificity_ge_0.80")
+    high_sensitivity = choose_constrained(sweep_rows, 0.75, "high_sensitivity_specificity_ge_0.75")
+    target_points = [choose_sensitivity_target(sweep_rows, target) for target in (0.65, 0.70, 0.75, 0.80)]
+    candidate_rows = [conservative, primary, high_sensitivity] + target_points
+    if not primary.get("available"):
+        raise RuntimeError("No validation threshold satisfies specificity >= 0.80.")
+
     raw_metrics = metric_report(labels, raw_probs)
     calibrated_metrics = metric_report(labels, calibrated_probs)
+    calibration_report = {
+        "raw": {
+            **raw_metrics,
+            "calibration_intercept_slope": calibration_slope_intercept(labels, raw_probs),
+            "calibration_curve": calibration_curve_report(labels, raw_probs),
+        },
+        "platt_calibrated": {
+            **calibrated_metrics,
+            "platt_a": float(calibrator.model.coef_[0][0]),
+            "platt_b": float(calibrator.model.intercept_[0]),
+            "platt_fit": platt_fit,
+            "calibration_intercept_slope": calibration_slope_intercept(labels, calibrated_probs),
+            "calibration_curve": calibration_curve_report(labels, calibrated_probs),
+        },
+    }
 
-    calibrator_path = checkpoint_dir / "platt_calibrator.pkl"
+    calibrator_path = checkpoint_dir / "platt_calibrator_screening.pkl"
     calibrator.save(calibrator_path)
     logits_path = METRICS_DIR / "validation_logits_selected_checkpoint.jsonl"
+    sweep_path = METRICS_DIR / "validation_calibrated_threshold_sweep.csv"
+    candidate_path = METRICS_DIR / "validation_candidate_operating_points.csv"
+    selected_path = METRICS_DIR / "selected_screening_threshold.json"
     summary_path = METRICS_DIR / "calibration_summary.json"
     frozen_config_path = METRICS_DIR / "frozen_agent_config.json"
 
+    selected_threshold = {
+        "selection_dataset": "validation",
+        "probability_type": "platt_calibrated",
+        "selection_rule": "maximize sensitivity subject to specificity >= 0.80",
+        **primary,
+    }
+
     write_jsonl(logits_path, rows)
+    write_csv(sweep_path, sweep_rows)
+    write_csv(candidate_path, candidate_rows)
+    write_json(selected_path, selected_threshold)
     summary = {
         "status": "pass",
         "selected_checkpoint": str(checkpoint_dir),
@@ -218,21 +342,26 @@ def main():
         "validation": val_summary,
         "max_length": max_length,
         "eval_batch_size": eval_batch_size,
-        "raw_metrics": raw_metrics,
-        "calibrated_metrics": calibrated_metrics,
-        "selected_threshold": threshold,
+        "calibration": calibration_report,
+        "selected_threshold": selected_threshold,
+        "candidate_operating_points": candidate_rows,
         "calibrator_path": str(calibrator_path),
         "validation_logits_path": str(logits_path),
+        "threshold_sweep_path": str(sweep_path),
+        "candidate_operating_points_path": str(candidate_path),
+        "selected_screening_threshold_path": str(selected_path),
         "frozen_test_used": False,
     }
     write_json(summary_path, summary)
     frozen_config = {
         "selected_checkpoint": str(checkpoint_dir),
         "calibrator_path": str(calibrator_path),
-        "threshold": threshold["threshold"],
+        "threshold": selected_threshold["threshold"],
+        "threshold_selection": selected_threshold,
         "max_length": max_length,
         "model_dir": config["paths"]["model_dir"],
         "validation_calibration_summary": str(summary_path),
+        "selected_screening_threshold_path": str(selected_path),
         "frozen_test_used": False,
     }
     write_json(frozen_config_path, frozen_config)
