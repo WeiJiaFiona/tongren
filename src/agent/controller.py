@@ -2,7 +2,9 @@
 import sys
 from pathlib import Path
 
-ROOT = Path("/public_bme/home/jiawei2022/tongren_bme_transition")
+import os
+
+ROOT = Path(os.environ.get("TONGREN_PROJECT_ROOT", "/public_bme/home/jiawei2022/tongren_bme_transition"))
 sys.path.insert(0, str(ROOT / "code"))
 
 from src.agent.report_builder import build_report
